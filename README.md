@@ -18,9 +18,11 @@ Repository: [https://github.com/sakshamdev/study-bot](https://github.com/saksham
 - `my_backend.example.py`: Starter template for building a custom backend.
 - `style.css`: Custom CSS styling, responsive layout tokens, and typography.
 - `StudyBot_Workshop.ipynb`: The complete Colab workshop notebook where students build and evaluate their RAG bot.
+- `workshop.md`: **Facilitator & Presenter Guide** for conducting the ATMOS '26 workshop (handoff flow, live script, and troubleshooting).
 - `workshop.py`: Lightweight interface wrapper for quick execution directly inside notebooks.
 - `Campbell_Chapters_3-5.pdf`: Sample notes used for demonstration.
 - `requirements.txt`: Python dependencies (`gradio`, `google-genai`, `pypdf`, `sentence-transformers`, `numpy`).
+- `run_locally.bat`: One-click startup script for Windows.
 - `test_backend.py`: Offline unit test suite.
 - `assets/`: Branding assets (including IEEE Student Branch BPHC logo).
 
