@@ -257,14 +257,17 @@ def launch_app() -> None:
     if BACKEND_NAME == "rag_backend":
         notes = importlib.import_module(BACKEND_NAME).NOTES_PDF
         if not os.getenv("GEMINI_API_KEY"):
-            print("WARNING: GEMINI_API_KEY is not set; questions will fail.")
+            print("Notice: GEMINI_API_KEY is not set. Running in Offline Search mode (Option A).")
         if not Path(notes).is_file():
             print(f"WARNING: notes PDF not found: {notes}")
     build_app().queue().launch(
+        server_name="0.0.0.0",
+        server_port=7860,
         share=False,
         debug=False,
         show_api=False,
     )
+
 
 
 def launch_with(ask_fn, share: bool = True, inline: bool | None = None) -> None:

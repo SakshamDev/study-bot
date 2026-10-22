@@ -50,7 +50,7 @@ Everything can be done inside `StudyBot_Workshop.ipynb` using free Colab compute
 
 ### Prerequisites
 - Python 3.10+ (Python 3.12 recommended)
-- A Google Gemini API key from [Google AI Studio](https://aistudio.google.com/)
+- *(Optional)* A Google Gemini API key from [Google AI Studio](https://aistudio.google.com/) for generative answer synthesis. Zero API keys are needed for the built-in offline search mode!
 
 ### Setup & Launch
 In PowerShell or terminal:
@@ -60,18 +60,24 @@ In PowerShell or terminal:
 git clone https://github.com/sakshamdev/study-bot.git
 cd study-bot
 
-# 2. Create virtual environment & install dependencies
-python -m venv .venv
-.\.venv\Scripts\activate      # On macOS/Linux: source .venv/bin/activate
+# 2. Install dependencies (into your environment or virtualenv)
 pip install -r requirements.txt
 
-# 3. Set your Gemini API key & run
-$env:GEMINI_API_KEY = "your-gemini-api-key"   # On macOS/Linux: export GEMINI_API_KEY="your-gemini-api-key"
+# 3. Run the application
 python app.py
+# (On Windows, you can also simply double-click run_locally.bat)
 ```
 
-Open **http://127.0.0.1:7860** in your browser.  
-*(Note: On initial startup, the embedding model downloads and the notes PDF is indexed into memory).*
+- **Option A (Offline Search Mode — Zero API Key):** Just run `python app.py` directly without any keys. It uses local sentence embeddings against `Campbell_Chapters_3-5.pdf` to retrieve exact passages and page citations.
+- **Option B (Generative AI Synthesis):** Provide your Gemini key via environment variable:
+  ```powershell
+  $env:GEMINI_API_KEY = "your-gemini-api-key"   # On macOS/Linux: export GEMINI_API_KEY="your-gemini-api-key"
+  python app.py
+  ```
+
+Open **http://127.0.0.1:7860** (or **http://localhost:7860**) in your browser.  
+*(Note: On initial startup, the lightweight local embedding model downloads and indexes the notes PDF into memory).*
+
 
 ### Using Your Own Notes
 Set the `NOTES_PDF` environment variable to point to any searchable text PDF:
