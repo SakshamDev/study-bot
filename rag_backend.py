@@ -2,16 +2,16 @@
 
 PDF -> chunks -> embeddings -> search -> Gemini answer with sources.
 
-This is the DEFAULT bot of the app. To build your own, copy
-`my_backend.example.py` to `my_backend.py` and run with
-STUDYBOT_BACKEND=my_backend (see README).
+Supports two modes:
+  - Option B (Full Generative RAG): When GEMINI_API_KEY is present (in environment,
+    Colab secrets, or local .env), answers are synthesized by Gemini with citations.
+  - Option A (Extractive Search Mode): When GEMINI_API_KEY is not present, returns
+    the most relevant passage excerpts directly from the notes with page citations.
+    Zero external API keys or credentials required!
 
 Environment variables:
-    GEMINI_API_KEY   required
-    NOTES_PDF        path to your notes (default: Campbell_Chapters_3-5.pdf)
-
-The contract with the interface is just:
-    ask(question, k, min_score) -> str     (raise an exception on failure)
+    GEMINI_API_KEY   optional: Gemini API key for synthesized generation
+    NOTES_PDF        path to notes PDF (default: Campbell_Chapters_3-5.pdf)
 """
 
 import os
@@ -28,6 +28,37 @@ LLM_MODEL = "gemini-flash-lite-latest"
 EMBED_MODEL = "all-MiniLM-L6-v2"
 
 _state = {}  # lazily built so importing this file stays fast
+
+
+def _get_api_key():
+    """Retrieve Gemini API key from environment, Colab secrets, or local .env."""
+    key = os.getenv("GEMINI_API_KEY")
+    if key and key.strip():
+        return key.strip()
+
+    # Try Google Colab secrets if available
+    try:
+        from google.colab import userdata
+        colab_key = userdata.get("GEMINI_API_KEY")
+        if colab_key and colab_key.strip():
+            return colab_key.strip()
+    except Exception:
+        pass
+
+    # Try local .env file
+    env_file = Path(__file__).parent / ".env"
+    if env_file.is_file():
+        try:
+            for line in env_file.read_text(encoding="utf-8").splitlines():
+                line = line.strip()
+                if line.startswith("GEMINI_API_KEY="):
+                    val = line.split("=", 1)[1].strip().strip('"').strip("'")
+                    if val:
+                        return val
+        except Exception:
+            pass
+
+    return None
 
 
 def load_pdf(path):
@@ -60,12 +91,7 @@ def _init():
     """Build the index and clients on first use."""
     if _state:
         return _state
-    from google import genai
-    from sentence_transformers import SentenceTransformer
 
-    key = os.getenv("GEMINI_API_KEY")
-    if not key:
-        raise RuntimeError("GEMINI_API_KEY is not set")
     if not os.path.exists(NOTES_PDF):
         raise RuntimeError(f"Notes PDF not found: {NOTES_PDF}")
 
@@ -73,10 +99,22 @@ def _init():
     if not pages:
         raise RuntimeError("No text found in the PDF (is it scanned?)")
     chunks = chunk(pages)
+
+    from sentence_transformers import SentenceTransformer
     model = SentenceTransformer(EMBED_MODEL)
     vectors = model.encode([c["text"] for c in chunks], normalize_embeddings=True)
+
+    key = _get_api_key()
+    client = None
+    if key:
+        try:
+            from google import genai
+            client = genai.Client(api_key=key, http_options={"timeout": 30000})
+        except Exception:
+            client = None
+
     _state.update(
-        client=genai.Client(api_key=key, http_options={"timeout": 30000}),
+        client=client,
         model=model,
         chunks=chunks,
         vectors=vectors,
@@ -94,7 +132,9 @@ def search(question, k=3):
 
 
 def llm(prompt, retries=3):
-    client = _init()["client"]
+    client = _state.get("client")
+    if not client:
+        raise RuntimeError("GEMINI_API_KEY is not configured")
     for attempt in range(retries):
         try:
             r = client.models.generate_content(
@@ -108,15 +148,38 @@ def llm(prompt, retries=3):
 
 
 def answer(question, top_chunks):
-    context = "\n\n".join(
-        f"[{n}] (p.{c['page']}) {c['text']}" for n, c in enumerate(top_chunks, start=1)
+    client = _state.get("client")
+    if client is None and _get_api_key():
+        try:
+            s = _init()
+            client = s.get("client")
+        except Exception:
+            client = None
+
+    # Option B: Full LLM generation with Gemini when key is available
+    if client is not None:
+        context = "\n\n".join(
+            f"[{n}] (p.{c['page']}) {c['text']}" for n, c in enumerate(top_chunks, start=1)
+        )
+        prompt = (
+            "You are a study helper. Answer ONLY from the context below. "
+            "If the answer isn't in the context, say exactly: That's not in your notes.\n\n"
+            f"Context:\n{context}\n\nQuestion: {question}"
+        )
+        return llm(prompt)
+
+    # Option A: Extractive Fallback Mode (No API key needed!)
+    # Formats the top matching excerpts directly from the textbook notes
+    passages = []
+    for c in top_chunks[:2]:
+        passages.append(f"> \"{c['text'].strip()}\"  \n*(Source: p. {c['page']})*")
+
+    quote_block = "\n\n".join(passages)
+    return (
+        f"### Extracted from your notes:\n\n"
+        f"{quote_block}\n\n"
+        f"*(Note: Running in offline search mode. To enable AI-synthesized answers with Gemini, add `GEMINI_API_KEY` to your environment or Colab secrets.)*"
     )
-    prompt = (
-        "You are a study helper. Answer ONLY from the context below. "
-        "If the answer isn't in the context, say exactly: That's not in your notes.\n\n"
-        f"Context:\n{context}\n\nQuestion: {question}"
-    )
-    return llm(prompt)
 
 
 def ask(question: str, k: int = 5, min_score: float = 0.5) -> str:

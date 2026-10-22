@@ -97,11 +97,16 @@ class RagBackendTests(unittest.TestCase):
             with self.assertRaises(RuntimeError):
                 rag_backend.ask("q")
 
-    def test_missing_key_is_a_clear_error(self):
+    def test_extractive_fallback_when_key_is_absent(self):
         rag_backend._state.clear()
-        with patch.dict("os.environ", {}, clear=True):
-            with self.assertRaises(Exception):
-                rag_backend.search("q")
+        hits = [{"page": 4, "text": "Hydrolysis splits molecules.", "score": 0.85}]
+        with patch.dict("os.environ", {}, clear=True), \
+             patch.object(rag_backend, "_get_api_key", return_value=None), \
+             patch.object(rag_backend, "search", return_value=hits):
+            reply = rag_backend.ask("what is hydrolysis?")
+            self.assertIn("Hydrolysis splits molecules.", reply)
+            self.assertIn("Sources: p. 4", reply)
+            self.assertIn("Offline Search Mode", reply)
 
 
 if __name__ == "__main__":
