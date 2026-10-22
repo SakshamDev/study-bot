@@ -1,0 +1,5 @@
+-r requirements.txt
+google-genai
+pypdf
+sentence-transformers
+numpy

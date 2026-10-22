@@ -1,0 +1,10 @@
+.venv/
+__pycache__/
+.gradio/
+.browsers/
+*.log
+.env
+my_backend.py
+notes.pdf
+*.pdf
+!Campbell_Chapters_3-5.pdf
